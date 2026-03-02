@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>ROVER MASTER HUD</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#05000a">
+    
+    <link rel="manifest" href="manifest.json">
+    
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        * { 
+            touch-action: none; 
+            -webkit-user-select: none; 
+            -webkit-tap-highlight-color: transparent; 
+            box-sizing: border-box;
+        }
+        body { 
+            background-color: #05000a; 
+            color: #cc00ff; 
+            font-family: 'Orbitron', sans-serif; 
+            margin: 0; 
+            padding: 0; 
+            overflow: hidden; 
+            height: 100vh; 
+            width: 100vw; 
+            position: fixed;
+            overscroll-behavior: none;
+        }
+        #terminal { position: absolute; top: 15px; right: 15px; width: 160px; height: 100px; background: rgba(0, 0, 0, 0.6); border-right: 3px solid #00ff00; color: #00ff00; font-size: 10px; padding: 8px; overflow: hidden; z-index: 30; pointer-events: none; border-radius: 4px; }
+        #video-container { position: absolute; top: 0; left: 0; width: 100%; height: 65%; background: #000; border-bottom: 2px solid #6600cc; display: flex; justify-content: center; align-items: center; }
+        #video-stream { width: 100%; height: 100%; object-fit: contain; }
+        .controls-layer { position: absolute; bottom: 0; width: 100%; height: 35%; display: flex; justify-content: space-around; align-items: center; background: linear-gradient(to top, #1a0033, #05000a); z-index: 20; padding: 10px; }
+        .control-group { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+        .row { display: flex; gap: 10px; }
+        .btn { width: 85px; height: 85px; background: rgba(51, 0, 102, 0.6); border: 2px solid #9900cc; color: #e0b3ff; border-radius: 18px; font-size: 32px; box-shadow: 0 0 10px rgba(204, 0, 255, 0.3); transition: 0.1s; display: flex; align-items: center; justify-content: center; }
+        .btn:active { background: #cc00ff; color: #000; box-shadow: 0 0 30px #cc00ff; transform: scale(0.92); }
+        .btn-fn { height: 35px; width: 120px; font-size: 11px; background: #330066; border-color: #6600cc; border-radius: 6px; }
+        .btn-volt { background: #004444; border-color: #00ffff; color: #00ffff; }
+        .btn-cam { background: #444400; border-color: #ffff00; color: #ffff00; }
+        .label { font-size: 10px; color: #9900cc; text-transform: uppercase; letter-spacing: 1px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div id="terminal">>> SISTEMA HUD OK...</div>
+    <div id="video-container">
+        <img id="video-stream" src="http://192.168.0.187:8080/video" onerror="this.src=this.src;">
+    </div>
+    <div class="controls-layer">
+        <div class="control-group">
+            <div class="label">Tracción</div>
+            <button class="btn" id="btn-F" ontouchstart="vibrate(); moveStart('F')" ontouchend="moveEnd('F')">▲</button>
+            <button class="btn" id="btn-B" ontouchstart="vibrate(); moveStart('B')" ontouchend="moveEnd('B')">▼</button>
+        </div>
+        <div class="control-group">
+            <div class="label">Cámara / Luz</div>
+            <button class="btn btn-fn btn-cam" onclick="vibrate(); fetch('http://192.168.0.187:8080/settings/ffc?set=toggle')">CAM SWAP</button>
+            <button class="btn btn-fn btn-cam" onclick="vibrate(); toggleFlash()">LED FLASH</button>
+            <div class="label" style="margin-top:5px;">Voltaje</div>
+            <button class="btn btn-fn btn-volt" onclick="vibrate(); send('V190')">6V (SEGURO)</button>
+            <button class="btn btn-fn btn-volt" onclick="vibrate(); send('V220')">7V (MÁX)</button>
+        </div>
+        <div class="control-group">
+            <div class="label">Giro</div>
+            <div class="row">
+                <button class="btn" id="btn-L" ontouchstart="vibrate(); turnStart('L')" ontouchend="turnEnd()">◀</button>
+                <button class="btn" id="btn-R" ontouchstart="vibrate(); turnStart('R')" ontouchend="turnEnd()">▶</button>
+            </div>
+            <div class="label" style="margin-top:5px;">Curvas</div>
+            <div class="row">
+                <button class="btn" style="height:55px; width:90px; font-size:14px; background:rgba(0,100,0,0.3);" ontouchstart="vibrate(); turnStart('I')" ontouchend="turnEnd()">IZQ</button>
+                <button class="btn" style="height:55px; width:90px; font-size:14px; background:rgba(0,100,0,0.3);" ontouchstart="vibrate(); turnStart('G')" ontouchend="turnEnd()">DER</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const IP_ROVER = "192.168.0.187"; 
+        let currentMove = 'S';
+        let flashOn = false;
+
+        function vibrate() { if(navigator.vibrate) navigator.vibrate(40); }
+
+        function send(cmd) {
+            fetch(`http://${IP_ROVER}:8081/comando?val=${cmd}`, { mode: 'no-cors' });
+            const t = document.getElementById('terminal');
+            t.innerHTML = `> TX: ${cmd}<br>` + t.innerHTML.substring(0, 80);
+        }
+
+        function moveStart(dir) { currentMove = dir; send(dir); }
+        function moveEnd(dir) { if (currentMove === dir) { currentMove = 'S'; send('S'); } }
+        function turnStart(dir) { send(dir); }
+        function turnEnd() { send(currentMove); }
+
+        function toggleFlash() {
+            flashOn = !flashOn;
+            const state = flashOn ? 'on' : 'off';
+            fetch(`http://${IP_ROVER}:8080/enabletorch?${state}`).catch(e => {});
+            document.getElementById('terminal').innerHTML = `> LED: ${state.toUpperCase()}<br>` + document.getElementById('terminal').innerHTML;
+        }
+
+        // Bloqueo de menú contextual (clic derecho)
+        window.oncontextmenu = function(event) { event.preventDefault(); event.stopPropagation(); return false; };
+    </script>
+</body>
+</html>

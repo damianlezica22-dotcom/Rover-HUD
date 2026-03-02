@@ -5,13 +5,12 @@
   "display": "standalone",
   "background_color": "#05000a",
   "theme_color": "#05000a",
-  "orientation": "landscape",
+  "orientation": "portrait",
   "icons": [
     {
       "src": "https://cdn-icons-png.flaticon.com/512/2596/2596924.png",
       "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "type": "image/png"
     }
   ]
 }
